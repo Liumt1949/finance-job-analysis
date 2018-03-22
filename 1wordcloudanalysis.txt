@@ -1,0 +1,125 @@
+
+####################################################################################
+##                                                                                ## 
+##                             Word Cloud Analysis                                ##  
+##                                                                                ## 
+####################################################################################
+
+rm(list=ls())   ## 清空工作环境
+setwd("E:/financejob/financejob") 
+
+## 首先安装以下程序包
+#install.packages("readxl") //安装包，如果已经安装了该包则不需再运行
+library(readxl)
+#install.packages("jiebaR",repo="http://mirrors.xmu.edu.cn/CRAN/")
+library(jiebaRD)
+library(jiebaR)
+library(stringr)
+library(ggplot2)
+#install.packages("wordcloud2",repo="http://mirrors.xmu.edu.cn/CRAN/")
+library(wordcloud2)
+
+#读入csv格式的数据
+job.info=read.csv("financejob.csv",header = T)
+
+
+#去空格
+job.info$category=str_trim(job.info$category,"both")
+job.info$descrip = str_replace_all(job.info$descrip,pattern = "(\t)|(\n)|(\r)", replacement = "")
+
+
+
+##############岗位描述处理
+mixseg = worker() ##  按照缺省值，设置分词引擎
+
+subdata1 = as.character(job.info$descrip[1])  #读入第一条数据的岗位描述，以其为例，进行分词测试
+fenci = mixseg[subdata1] #分词
+fenci # 展示第一条数据的岗位描述的分词结果,以下循环为依次对数据集中所有的岗位描述进行分词
+for (i in 2:length(job.info$descrip)){ 
+  subdata = as.character(job.info$descrip[i])
+  subfenci = mixseg[subdata]
+  fenci = c(fenci,subfenci)
+}
+
+
+###########  以下部分为去掉无意义的停词
+###由于停词太多，为了方便运行速度的考虑，将停词分为3个txt
+thetable = table(fenci)   #统计分词词频
+dftable = as.data.frame(thetable) # 将格式转成data.frame格式
+dftable= dftable[order(-dftable$Freq),]
+#导出一个原始分词的数据
+#write.csv(dftable,file="E:/financejob/financejob/fenci.csv")
+
+#提取词频数大于500的词研究
+dftable = dftable[which(dftable$Freq>500),] 
+#write.csv(dftable,file="E:/financejob/financejob/fenci0.csv")
+
+
+#读入停词表
+stopwords = unlist(read.table("stopwords1.txt",stringsAsFactors=F,fileEncoding = "GB2312")) #读入停词表
+dftable1 = dftable
+# 根据读入的停词表，去掉停词 
+for (i in length(dftable$fenci):1) {
+  for (j in 1:length(stopwords)) {
+    if (dftable$fenci[i]==stopwords[j]){
+      dftable1 = dftable1[-i,]
+    }
+  }
+}
+dftable1= dftable1[order(-dftable1$Freq),]
+#write.csv(dftable1,file="E:/financejob/financejob/fenci1.csv")
+
+##########读入第二个停词表并去停词
+newstopwords = unlist(read.table("stopwords2.txt",stringsAsFactors=F,fileEncoding = "GB2312")) 
+dftable2 = dftable1
+for (i in length(dftable1$fenci):1) {
+  for (j in 1:length(newstopwords)) {
+    if (dftable1$fenci[i]==newstopwords[j]){
+      dftable2 = dftable2[-i,]
+    }
+  }
+}
+dftable2= dftable2[order(-dftable2$Freq),]
+#write.csv(dftable2,file="E:/financejob/financejob/fenci2.csv")
+
+##########读入第三个停词表并去停词
+mystopw= unlist(read.table("stopwords3.txt",stringsAsFactors=F,fileEncoding = "GB2312")) #读入停词表
+dftable3= dftable2
+for (i in length(dftable2$fenci):1) {
+  for (j in 1:length(mystopw)) {
+    if (dftable2$fenci[i]==mystopw[j]){
+      dftable3= dftable3[-i,]
+    }
+  }
+}
+dftable3= dftable3[order(-dftable3$Freq),]
+#write.csv(dftable3,file="E:/financejob/financejob/fenci3.csv")
+
+####################绘制词云图
+##### mac代码段
+wordcloud2(dftable3,fontFamily = "STKaiti")
+##### win代码段
+wordcloud2(dftable3,size=2,shape="star") #全部
+
+
+
+#####################################岗位分类分析
+category=job.info$category
+table(category)
+category=as.data.frame(ftable(category))
+category= category[order(-category$Freq),]
+#write.csv(category,file="E:/financejob/financejob/category.csv")
+
+## 其它由于涉及种类太多，选择使用词云图的方式展示
+## 提取频数前80的岗位分类的名称和频数
+category$category= as.character(category$category)
+top80=category[order(-category$Freq),][2:81,] #第一个是"其他",不选
+
+##############绘制岗位词云图
+category$Freq[which(category$category=="其他")] = 0 #将"其他"去除
+##### mac代码段
+wordcloud2(top80, size = 0.2, fontFamily = "STKaiti",shape = "diamond") #词云图 
+##### win代码段
+#wordcloud2(top80, size = 0.24,shape = "circle") #词云图 
+wordcloud2(top80, size =0.25, minRotation = -pi/6, maxRotation = -pi/6,rotateRatio = 0) #词云图 
+
